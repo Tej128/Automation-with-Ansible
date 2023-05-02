@@ -1,0 +1,7 @@
+[HAproxy]
+HAproxy ansible_host=89.42.140.142 ansible_user=ubuntu
+
+[webservers]
+devA ansible_host=103.57.74.87 ansible_user=ubuntu
+devB ansible_host=103.57.74.179 ansible_user=ubuntu
+devC ansible_host=103.57.74.165 ansible_user=ubuntu
