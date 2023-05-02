@@ -1,8 +1,6 @@
 - name: Configure HAProxy Load Balancer
   hosts: HAproxy
   become: yes
-  vars:
-    haproxy_host_ipv4_address: "{{ hostvars[inventory_hostname]['ansible_default.ipv4.address']['address'] }}"
 
   tasks:
     - name: Install HAProxy
