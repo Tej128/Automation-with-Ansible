@@ -10,16 +10,21 @@
 
     - name: Configure HAProxy
       template:
-        src: haproxy.cfg
+        src: haproxy.cfg.j2
         dest: /etc/haproxy/haproxy.cfg
-      notify: restart haproxy
+      become: yes
+      notify: restart
 
-  handlers:
-    - name: restart haproxy
+    - name: Reload systemd configuration
+      systemd:
+        daemon_reexec: yes
+      become: true
+
+    - name: Restart HAProxy
+      become: yes
       service:
         name: haproxy
         state: restarted
-
 
 - name: Configure Flask webserver
   hosts: webservers
@@ -64,15 +69,27 @@
         mode: '0755'
         recurse: yes
 
-    - name: Installing flask
-      shell: pip3 install Flask
-
     - name: Copy Flask app file
       copy:
         src: ./app.py
         dest: /home/ubuntu/flask-app/venv/app.py
 
-    - name: Run Flask app
-      shell: nohup python3 /home/ubuntu/flask-app/venv/app.py
-      async: 500
-      poll: 0
+    - name: Create systemd service file
+      template:
+        src: app.service.j2
+        dest: /etc/systemd/system/flask-app.service
+      notify: restart flask-app
+
+    - name: Reload systemd configuration
+      systemd:
+        daemon_reexec: yes
+      become: true
+
+    - name: Start Flask app service
+      systemd:
+        name: flask-app
+        state: started
+        enabled: yes
+
+    - name: restart flask-app
+      command: systemctl restart flask-app
