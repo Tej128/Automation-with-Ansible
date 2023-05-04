@@ -14,12 +14,8 @@
         dest: /etc/haproxy/haproxy.cfg
       become: yes
       notify: restart
-
-    - name: Reload systemd configuration
-      systemd:
-        daemon_reexec: yes
-      become: true
-
+      
+  handlers:
     - name: Restart HAProxy
       become: yes
       service:
