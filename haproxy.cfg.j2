@@ -1,3 +1,5 @@
+defaults
+        log     global
 global
         log /dev/log    local0
         log /dev/log    local1 notice
@@ -40,8 +42,9 @@ frontend web-frontend
 
 backend web-backend
         balance roundrobin
-	mode http
-	option forwardfor
-     {% for host in groups["webservers"] %}
-	server {{ host }} {{ hostvars[host]["ansible_default_ipv4"]["address"] }}:8000 check
-     {% endfor %}
+        option forwardfor
+        http-request set-header X-Forwarded-Port %[dst_port]
+        http-request add-header X-Forwarded-Proto https if { ssl_fc }
+{%  for server in groups['webservers'] %}
+    server {{ hostvars[server]['inventory_hostname'] }} {{ hostvars[server]['ansible_default_ipv4']['address']}}:8000
+{% endfor %}
