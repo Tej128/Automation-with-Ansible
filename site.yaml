@@ -10,7 +10,7 @@
 
     - name: Configure HAProxy
       template:
-        src: haproxy.cfg.j2
+        src: haproxy.cfg
         dest: /etc/haproxy/haproxy.cfg
       notify: restart haproxy
 
@@ -23,7 +23,7 @@
 
 - name: Configure Flask webserver
   hosts: webservers
-  become: true
+  become: yes
   tasks:
     - name: Update apt cache
       apt:
@@ -69,11 +69,10 @@
 
     - name: Copy Flask app file
       copy:
-        src: app.py
+        src: ./app.py
         dest: /home/ubuntu/flask-app/venv/app.py
 
     - name: Run Flask app
       shell: nohup python3 /home/ubuntu/flask-app/venv/app.py
       async: 500
       poll: 0
-
