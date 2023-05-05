@@ -1,30 +1,28 @@
----
-- name: Configure HAProxy Load Balancer
+- name: Install and configure HAProxy
   hosts: HAproxy
   become: yes
-
+  vars:
+    haproxy_pkg: haproxy
+    haproxy_cfg_src: haproxy.cfg.j2
   tasks:
-    - name: Install HAProxy
-      apt:
-        name: haproxy
-        state: latest
+    - name: Install HAProxy package
+      package:
+        name: "{{ haproxy_pkg }}"
+        state: present
 
-    - name: Configure HAProxy
+    - name: Copy HAProxy configuration file
       template:
-        src: haproxy.cfg.j2
+        src: "{{ haproxy_cfg_src }}"
         dest: /etc/haproxy/haproxy.cfg
-      become: yes
-      notify: restart
-      
-  handlers:
-    - name: Restart HAProxy
-      become: yes
-      service:
-        name: haproxy
-        state: restarted
 
-- hosts: webservers
-  become: yes
+    - name: "Start HAproxy"
+      service:
+              name: "{{ haproxy_pkg }}"
+              state: started
+
+- name: Install and configure Flask web server
+  hosts: webservers
+  become: true
   tasks:
     - name: Update apt cache
       apt:
@@ -38,52 +36,68 @@
           - python3-venv
         state: present
 
-    - name: Create flask-app directory
+    - name: Create Flask app directory
       file:
         path: /home/ubuntu/flask-app
         state: directory
 
-    - name: Change directory to flask-app
+    - name: Change directory to Flask app directory
       shell: cd /home/ubuntu/flask-app
-      
-    - name: Install virtualenv package
-      apt:
-        name: python3-virtualenv
-        state: present
-        
-    - name: Creating virtual environment
-      file:
-        path: /home/ubuntu/flask-app/venv
-        state: directory
-        mode: '0755'
+
+    - name: Create virtual environment directory
+      shell: python3 -m venv /home/ubuntu/flask-app/venv
 
     - name: Set up virtual environment
-      pip:
-        name: Flask
-        virtualenv: /home/ubuntu/flask-app/venv
+      shell: python3 -m venv /home/ubuntu/flask-app/venv
 
-    - name: Set permissions for virtual environment
-      become: yes
-      become_user: root
-      file:
-        path: /home/ubuntu/flask-app/venv
-        mode: '0755'
-        recurse: yes
+    - name: Install Flask
+      shell: pip3 install Flask
 
     - name: Copy Flask app file
       copy:
-        src: ./app.py
+        src: app.py
         dest: /home/ubuntu/flask-app/venv/app.py
 
-    - name: Create systemd service file
-      template:
-        src: app.service.j2
+    - name: Start Flask app
+      copy:
         dest: /etc/systemd/system/flask-app.service
-      notify: restart flask-app
-      
-  handlers:
-    - name: restart flask-app
+        content: |
+          [Unit]
+          Description=Flask App Service
+
+          [Service]
+          User=ubuntu
+          Environment=FLASK_APP=/home/ubuntu/flask-app/venv/app.py
+          Environment=FLASK_ENV=development
+          Environment=FLASK_RUN_HOST={{ ansible_default_ipv4.address }}
+          Environment=FLASK_RUN_PORT=5000
+          WorkingDirectory=/home/ubuntu/flask-app/venv
+          ExecStart=/home/ubuntu/flask-app/venv/bin/flask run
+          Restart=always
+
+          [Install]
+          WantedBy=multi-user.target
+    - name: Reload systemd configuration
       systemd:
-        name: flask-app
-        state: restarted
-        enabled: yes
+        daemon_reexec: yes
+      become: true
+    - name: Start Flask app service
+      systemd:
+         name: flask-app
+         state: started
+         enabled: yes
+    - name: restart flask-app
+      shell: systemctl restart flask-app
+
+    - name: Restart Flask app service
+      service:
+         name: flask-app
+         state: restarted
+
+- hosts: HAproxy
+  become: true
+  tasks:
+    - name: "starting haproxy services"
+      service:
+              name: "haproxy"
+              state: started
