@@ -1,65 +1,63 @@
 ---
-- name: Update cache in all hosts
-  hosts: all
+######DEPLOYING WEBSERVERS#######
+- hosts: webservers
   become: true
+  become_method: sudo
+  gather_facts: true
   tasks:
-    - name: Update Cache
+    - name: apt update
       apt:
-        update_cache: yes
-
-- name: Configure Web Servers
-  hosts: webservers
-  become: true
-  tasks:
-    - name: Update apt cache
-      apt:
-        update_cache: yes
-
-    - name: Install Requirements
-      apt:
-        name: python3-pip
-        state: latest
         update_cache: true
 
-    - name: Installing Flask
+    - name: Installing Requirements
+      apt:
+       name: python3-pip
+       state: latest
+       update_cache: true
+
+    - name: Installing flask
       pip:
         executable: pip3
         name: flask
         state: latest
 
-    - name: Install Flask Service Deployment
+    - name: Installing flask Services
       apt:
         name: gunicorn
 
-    - name: Copy app
+    - name: Copy flask app
       copy:
         src: app.py
-        dest: /home/ubuntu/app1.py
+        dest: /home/ubuntu/app.py
         owner: ubuntu
         mode: '0644'
 
-    - name: Deploying Flask Webservers
-      shell: gunicorn -w 2 -D -b 0.0.0.0:8000 app1:app
+    - name: Running Flask application
+      shell: gunicorn -w 2 -D -b 0.0.0.0:5000 app:app
 
-- name: Install HAProxy and Configure
-  hosts: HAproxy
+# haproxy configuration
+- hosts: all
+  gather_facts: true
+- hosts: HAproxy
   become: true
+
   tasks:
-    - name: Update apt cache
+
+    - name: apt update
       apt:
         update_cache: yes
 
-    - name: Installing HAProxy
-      package:
+    - name: Installing HAproxy
+      apt:
         name: haproxy
         state: present
 
-    - name: Copy HAProxy cfg file
+    - name: Configure HAproxy and Loadbalancer
       template:
         src: haproxy.cfg.j2
         dest: /etc/haproxy/haproxy.cfg
-
-    - name: Restarting HAProxy service
+ 
+    - name: Restarting Loadbalancer
       service:
         name: haproxy
         state: restarted
