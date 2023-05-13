@@ -1,0 +1,56 @@
+---
+######DEPLOYING WEBSERVERS#######
+- name: Deploy Flask web server with Gunicorn
+  hosts: webservers
+  become: true
+  
+  tasks:
+    - name: Install Python and pip
+      apt: name={{ item }} state=present
+      with_items:
+        - python
+        - python3-pip
+      
+    - name: Install Flask and Gunicorn
+      pip: name={{ item }} state=present
+      with_items:
+        - flask
+        - gunicorn
+
+
+    - name: Copy flask app
+      copy:
+        src: app.py
+        dest: /home/ubuntu/app.py
+        owner: ubuntu
+        mode: '0644'
+
+    - name: Running Flask application
+      shell: gunicorn -w 2 -D -b 0.0.0.0:5000 app:app
+
+# haproxy configuration
+- hosts: all
+  gather_facts: true
+- hosts: HAproxy
+  become: true
+
+  tasks:
+
+    - name: apt update
+      apt:
+        update_cache: yes
+
+    - name: Installing HAproxy
+      apt:
+        name: haproxy
+        state: present
+
+    - name: Configure HAproxy and Loadbalancer
+      template:
+        src: haproxy.cfg.j2
+        dest: /etc/haproxy/haproxy.cfg
+ 
+    - name: Restarting Loadbalancer
+      service:
+        name: haproxy
+        state: restarted
