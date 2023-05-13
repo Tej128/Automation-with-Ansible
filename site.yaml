@@ -1,26 +1,13 @@
-- name: Install and configure HAProxy
-  hosts: HAproxy
-  become: yes
-  vars:
-    haproxy_pkg: haproxy
-    haproxy_cfg_src: haproxy.cfg.j2
+---
+- name: Update cache in all hosts
+  hosts: all
+  become: true
   tasks:
-    - name: Install HAProxy package
-      package:
-        name: "{{ haproxy_pkg }}"
-        state: present
+    - name: Update Cache
+      apt:
+        update_cache: yes
 
-    - name: Copy HAProxy configuration file
-      template:
-        src: "{{ haproxy_cfg_src }}"
-        dest: /etc/haproxy/haproxy.cfg
-
-    - name: "Start HAproxy"
-      service:
-              name: "{{ haproxy_pkg }}"
-              state: started
-
-- name: Install and configure Flask web server
+- name: Configure Web Servers
   hosts: webservers
   become: true
   tasks:
@@ -28,76 +15,51 @@
       apt:
         update_cache: yes
 
-    - name: Install Python3, pip3, and venv
+    - name: Install Requirements
       apt:
-        name:
-          - python3
-          - python3-pip
-          - python3-venv
-        state: present
+        name: python3-pip
+        state: latest
+        update_cache: true
 
-    - name: Create Flask app directory
-      file:
-        path: /home/ubuntu/flask-app
-        state: directory
+    - name: Installing Flask
+      pip:
+        executable: pip3
+        name: flask
+        state: latest
 
-    - name: Change directory to Flask app directory
-      shell: cd /home/ubuntu/flask-app
+    - name: Install Flask Service Deployment
+      apt:
+        name: gunicorn
 
-    - name: Create virtual environment directory
-      shell: python3 -m venv /home/ubuntu/flask-app/venv
-
-    - name: Set up virtual environment
-      shell: python3 -m venv /home/ubuntu/flask-app/venv
-
-    - name: Install Flask
-      shell: pip3 install Flask
-
-    - name: Copy Flask app file
+    - name: Copy app
       copy:
         src: app.py
-        dest: /home/ubuntu/flask-app/venv/app.py
+        dest: /home/ubuntu/app1.py
+        owner: ubuntu
+        mode: '0644'
 
-    - name: Start Flask app
-      copy:
-        dest: /etc/systemd/system/flask-app.service
-        content: |
-          [Unit]
-          Description=Flask App Service
+    - name: Deploying Flask Webservers
+      shell: gunicorn -w 2 -D -b 0.0.0.0:8000 app1:app
 
-          [Service]
-          User=ubuntu
-          Environment=FLASK_APP=/home/ubuntu/flask-app/venv/app.py
-          Environment=FLASK_ENV=development
-          Environment=FLASK_RUN_HOST={{ ansible_default_ipv4.address }}
-          Environment=FLASK_RUN_PORT=5000
-          WorkingDirectory=/home/ubuntu/flask-app/venv
-          ExecStart=/home/ubuntu/flask-app/venv/bin/flask run
-          Restart=always
-
-          [Install]
-          WantedBy=multi-user.target
-    - name: Reload systemd configuration
-      systemd:
-        daemon_reexec: yes
-      become: true
-    - name: Start Flask app service
-      systemd:
-         name: flask-app
-         state: started
-         enabled: yes
-    - name: restart flask-app
-      shell: systemctl restart flask-app
-
-    - name: Restart Flask app service
-      service:
-         name: flask-app
-         state: restarted
-
-- hosts: HAproxy
+- name: Install HAProxy and Configure
+  hosts: HAproxy
   become: true
   tasks:
-    - name: "starting haproxy services"
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+
+    - name: Installing HAProxy
+      package:
+        name: haproxy
+        state: present
+
+    - name: Copy HAProxy cfg file
+      template:
+        src: haproxy.cfg.j2
+        dest: /etc/haproxy/haproxy.cfg
+
+    - name: Restarting HAProxy service
       service:
-              name: "haproxy"
-              state: started
+        name: haproxy
+        state: restarted
