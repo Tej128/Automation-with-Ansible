@@ -5,13 +5,13 @@
   become: true
   
   tasks:
-    - name: Install Python and pip
+    - name: Install Requirements
       apt: name={{ item }} state=present
       with_items:
         - python
         - python3-pip
       
-    - name: Install Flask and Gunicorn
+    - name: Install Flask and Service deployment
       pip: name={{ item }} state=present
       with_items:
         - flask
@@ -25,7 +25,7 @@
         owner: ubuntu
         mode: '0644'
 
-    - name: Running Flask application
+    - name: Deploying Flask application
       shell: gunicorn -w 2 -D -b 0.0.0.0:5000 app:app
 
 # haproxy configuration
